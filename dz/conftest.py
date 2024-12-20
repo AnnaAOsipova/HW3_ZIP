@@ -59,10 +59,10 @@ def log_stat(make_files):
     count_files = len(make_files)
     size_files = data["bs"]
     stat_file_path = 'stat.txt'
-    #yield
+    yield
 
-    #with open('/proc/loadavg', 'r') as loadavg_file:
-       # loadavg_stats = loadavg_file.read().strip()
+    with open('/proc/loadavg', 'r') as loadavg_file:
+        loadavg_stats = loadavg_file.read().strip()
     current_time = datetime.now().strftime("%H-%M-%S-%f")
     log_entry = f'{current_time=}, {count_files=}, {size_files=}, {loadavg_stats=}\n'
 
