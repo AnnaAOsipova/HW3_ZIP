@@ -5,6 +5,6 @@ with open('config.yaml') as f:
     data = yaml.safe_load(f)
 
 class TestNegative:
-    def test_nstep1(self):
+    def test_nstep1(self,make_bad_arx, log_stat):
         assert checkout_negative("cd {}; 7z t arxbad.{}".format(data["folder_out"],
                                                                 data["type"]), "ERROR:"), "test2 FAIL"
