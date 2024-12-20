@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>report.html</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function findAll(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sortColumn(elem) {
+    toggleSortStates(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('result')) {
+        key = keyResult;
+    } else if (elem.classList.contains('links')) {
+        key = keyLink;
+    } else {
+        key = keyAlpha;
+    }
+    sortTable(elem, key(colIndex));
+}
+
+function showAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(showExtras);
+}
+
+function hideAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(hideExtras);
+}
+
+function showExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hideExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function showFilters() {
+    let visibleString = getQueryParameter('visible') || 'all';
+    visibleString = visibleString.toLowerCase();
+    const checkedItems = visibleString.split(',');
+
+    const filterItems = document.getElementsByClassName('filter');
+    for (let i = 0; i < filterItems.length; i++) {
+        filterItems[i].hidden = false;
+
+        if (visibleString != 'all') {
+            filterItems[i].checked = checkedItems.includes(filterItems[i].getAttribute('data-test-result'));
+            filterTable(filterItems[i]);
+        }
+    }
+}
+
+function addCollapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:showAllExtras()">Show all details</a> / ' +
+                            '<a href="javascript:hideAllExtras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    findAll('.col-result').forEach(function(elem) {
+        const collapsed = getQueryParameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                showExtras(event.currentTarget);
+            } else {
+                hideExtras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function getQueryParameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    resetSortHeaders();
+
+    addCollapse();
+
+    showFilters();
+
+    sortColumn(find('.initial-sort'));
+
+    findAll('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sortColumn(elem);
+            }, false);
+    });
+}
+
+function sortTable(clicked, keyFunc) {
+    const rows = findAll('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sortedRows = sort(rows, keyFunc, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sortedRows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, keyFunc, reversed) {
+    const sortArray = items.map(function(item, i) {
+        return [keyFunc(item), i];
+    });
+
+    sortArray.sort(function(a, b) {
+        const keyA = a[0];
+        const keyB = b[0];
+
+        if (keyA == keyB) return 0;
+
+        if (reversed) {
+            return keyA < keyB ? 1 : -1;
+        } else {
+            return keyA > keyB ? 1 : -1;
+        }
+    });
+
+    return sortArray.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function keyAlpha(colIndex) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[colIndex].firstChild.data.toLowerCase();
+    };
+}
+
+function keyLink(colIndex) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[colIndex].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function keyResult(colIndex) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[colIndex].firstChild.data);
+    };
+}
+
+function resetSortHeaders() {
+    findAll('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    findAll('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggleSortStates(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        resetSortHeaders();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function isAllRowsHidden(value) {
+    return value.hidden == false;
+}
+
+function filterTable(elem) { // eslint-disable-line no-unused-vars
+    const outcomeAtt = 'data-test-result';
+    const outcome = elem.getAttribute(outcomeAtt);
+    const classOutcome = outcome + ' results-table-row';
+    const outcomeRows = document.getElementsByClassName(classOutcome);
+
+    for(let i = 0; i < outcomeRows.length; i++){
+        outcomeRows[i].hidden = !elem.checked;
+    }
+
+    const rows = findAll('.results-table-row').filter(isAllRowsHidden);
+    const allRowsHidden = rows.length == 0 ? true : false;
+    const notFoundMessage = document.getElementById('not-found-message');
+    notFoundMessage.hidden = !allRowsHidden;
+}
+</script>
+    <h1>report.html</h1>
+    <p>Report generated on 29-Apr-2023 at 12:44:52 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.2.0</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "1.0.0", "pytest": "7.2.1"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Linux-5.19.0-41-generic-x86_64-with-glibc2.35</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"html": "3.2.0", "html-reporter": "0.2.9", "metadata": "2.0.4"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.10.6</td></tr></table>
+    <h2>Summary</h2>
+    <p>8 tests ran in 1.26 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="passed">8 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="failed">0 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable" col="duration">Duration</th>
+          <th class="sortable links" col="links">Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_1.py::TestPositive::test_step1</td>
+          <td class="col-duration">0.15</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Start: 12:44:51.737237
+
+
+
+
+
+<br/> -----------------------------Captured stderr setup------------------------------ <br/>mkdir: невозможно создать каталог «/home/zerg/tst»: Файл существует
+mkdir: невозможно создать каталог «/home/zerg/tst»: Файл существует
+mkdir: невозможно создать каталог «/home/zerg/folder1»: Файл существует
+mkdir: невозможно создать каталог «/home/zerg/folder2»: Файл существует
+1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,00581269 s, 180 MB/s
+1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,00570199 s, 184 MB/s
+1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,00985721 s, 106 MB/s
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Open archive: /home/zerg/out/arx.zip
+--
+Path = /home/zerg/out/arx.zip
+Type = zip
+Physical Size = 22
+
+Scanning the drive:
+4 folders, 9 files, 3146442 bytes (3073 KiB)
+
+Updating archive: /home/zerg/out/arx.zip
+
+Items to compress: 13
+
+
+Files read from disk: 9
+Archive size: 3148214 bytes (3075 KiB)
+Everything is Ok
+
+arx2.7z
+arx.7z
+arx.zip
+
+<br/> ----------------------------Captured stdout teardown---------------------------- <br/>
+Finish: 12:44:51.896671
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_1.py::TestPositive::test_step2</td>
+          <td class="col-duration">0.17</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Start: 12:44:51.897959
+
+
+
+
+<br/> -----------------------------Captured stderr setup------------------------------ <br/>1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,00619137 s, 169 MB/s
+1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,00732951 s, 143 MB/s
+1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,00561532 s, 187 MB/s
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Open archive: /home/zerg/out/arx.zip
+--
+Path = /home/zerg/out/arx.zip
+Type = zip
+Physical Size = 3148214
+
+Scanning the drive:
+4 folders, 9 files, 3146442 bytes (3073 KiB)
+
+Updating archive: /home/zerg/out/arx.zip
+
+Items to compress: 13
+
+
+Files read from disk: 9
+Archive size: 6294308 bytes (6147 KiB)
+Everything is Ok
+
+
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Scanning the drive for archives:
+1 file, 6294308 bytes (6147 KiB)
+
+Extracting archive: arx.zip
+--
+Path = arx.zip
+Type = zip
+Physical Size = 6294308
+
+Everything is Ok
+
+Folders: 4
+Files: 12
+Size:       6292170
+Compressed: 6294308
+
+7FRJ9
+arx2.7z
+cache
+CACHEDIR.TAG
+CWM42
+EEPQ9
+IB0QH
+nodeids
+README.md
+stepwise
+v
+XI71U
+XY6AK
+
+7FRJ9
+arx2.7z
+cache
+CACHEDIR.TAG
+CWM42
+EEPQ9
+IB0QH
+nodeids
+README.md
+stepwise
+v
+XI71U
+XY6AK
+
+7FRJ9
+arx2.7z
+cache
+CACHEDIR.TAG
+CWM42
+EEPQ9
+IB0QH
+nodeids
+README.md
+stepwise
+v
+XI71U
+XY6AK
+
+<br/> ----------------------------Captured stdout teardown---------------------------- <br/>
+Finish: 12:44:52.074084
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_1.py::TestPositive::test_step3</td>
+          <td class="col-duration">0.02</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Start: 12:44:52.075477
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Scanning the drive for archives:
+1 file, 6294308 bytes (6147 KiB)
+
+Testing archive: arx.zip
+--
+Path = arx.zip
+Type = zip
+Physical Size = 6294308
+
+Everything is Ok
+
+Folders: 4
+Files: 12
+Size:       6292170
+Compressed: 6294308
+
+<br/> ----------------------------Captured stdout teardown---------------------------- <br/>
+Finish: 12:44:52.095917
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_1.py::TestPositive::test_step4</td>
+          <td class="col-duration">0.11</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Start: 12:44:52.097302
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Scanning the drive:
+4 folders, 9 files, 3146442 bytes (3073 KiB)
+
+Creating archive: arx2.zip
+
+Items to compress: 13
+
+
+Files read from disk: 9
+Archive size: 3148214 bytes (3075 KiB)
+Everything is Ok
+
+<br/> ----------------------------Captured stdout teardown---------------------------- <br/>
+Finish: 12:44:52.210090
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_1.py::TestPositive::test_step5</td>
+          <td class="col-duration">0.17</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Start: 12:44:52.211319
+
+
+
+
+<br/> -----------------------------Captured stderr setup------------------------------ <br/>1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,00680828 s, 154 MB/s
+1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,0057499 s, 182 MB/s
+1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,00568334 s, 184 MB/s
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Open archive: /home/zerg/out/arx.zip
+--
+Path = /home/zerg/out/arx.zip
+Type = zip
+Physical Size = 6294308
+
+Scanning the drive:
+4 folders, 9 files, 3146442 bytes (3073 KiB)
+
+Updating archive: /home/zerg/out/arx.zip
+
+Items to compress: 13
+
+
+Files read from disk: 9
+Archive size: 9440402 bytes (9220 KiB)
+Everything is Ok
+
+
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Scanning the drive for archives:
+1 file, 9440402 bytes (9220 KiB)
+
+Listing archive: arx.zip
+
+--
+Path = arx.zip
+Type = zip
+Physical Size = 9440402
+
+   Date      Time    Attr         Size   Compressed  Name
+------------------- ----- ------------ ------------  ------------------------
+2023-01-14 19:35:37 D....            0            0  ..out
+2023-01-14 19:35:37 .....          180          180  ..out/arx2.7z
+2023-01-28 11:46:58 D....            0            0  .pytest_cache
+2023-01-28 11:46:58 .....           37           37  .pytest_cache/.gitignore
+2023-01-28 11:46:58 .....          191          145  .pytest_cache/CACHEDIR.TAG
+2023-01-28 11:46:58 .....          302          206  .pytest_cache/README.md
+2023-01-28 11:46:58 D....            0            0  .pytest_cache/v
+2023-01-28 11:46:58 D....            0            0  .pytest_cache/v/cache
+2023-01-28 11:46:58 .....            2            2  .pytest_cache/v/cache/nodeids
+2023-01-28 11:46:58 .....            2            2  .pytest_cache/v/cache/stepwise
+2023-04-29 12:44:52 .....      1048576      1048576  2N5BS
+2023-04-29 12:44:51 .....      1048576      1048576  7FRJ9
+2023-04-29 12:44:51 .....      1048576      1048576  CWM42
+2023-04-29 12:44:52 .....      1048576      1048576  D47TP
+2023-04-29 12:44:51 .....      1048576      1048576  EEPQ9
+2023-04-29 12:44:51 .....      1048576      1048576  IB0QH
+2023-04-29 12:44:52 .....      1048576      1048576  Q9EW4
+2023-04-29 12:44:51 .....      1048576      1048576  XI71U
+2023-04-29 12:44:51 .....      1048576      1048576  XY6AK
+------------------- ----- ------------ ------------  ------------------------
+2023-04-29 12:44:52            9437898      9437756  15 files, 4 folders
+
+
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Scanning the drive for archives:
+1 file, 9440402 bytes (9220 KiB)
+
+Listing archive: arx.zip
+
+--
+Path = arx.zip
+Type = zip
+Physical Size = 9440402
+
+   Date      Time    Attr         Size   Compressed  Name
+------------------- ----- ------------ ------------  ------------------------
+2023-01-14 19:35:37 D....            0            0  ..out
+2023-01-14 19:35:37 .....          180          180  ..out/arx2.7z
+2023-01-28 11:46:58 D....            0            0  .pytest_cache
+2023-01-28 11:46:58 .....           37           37  .pytest_cache/.gitignore
+2023-01-28 11:46:58 .....          191          145  .pytest_cache/CACHEDIR.TAG
+2023-01-28 11:46:58 .....          302          206  .pytest_cache/README.md
+2023-01-28 11:46:58 D....            0            0  .pytest_cache/v
+2023-01-28 11:46:58 D....            0            0  .pytest_cache/v/cache
+2023-01-28 11:46:58 .....            2            2  .pytest_cache/v/cache/nodeids
+2023-01-28 11:46:58 .....            2            2  .pytest_cache/v/cache/stepwise
+2023-04-29 12:44:52 .....      1048576      1048576  2N5BS
+2023-04-29 12:44:51 .....      1048576      1048576  7FRJ9
+2023-04-29 12:44:51 .....      1048576      1048576  CWM42
+2023-04-29 12:44:52 .....      1048576      1048576  D47TP
+2023-04-29 12:44:51 .....      1048576      1048576  EEPQ9
+2023-04-29 12:44:51 .....      1048576      1048576  IB0QH
+2023-04-29 12:44:52 .....      1048576      1048576  Q9EW4
+2023-04-29 12:44:51 .....      1048576      1048576  XI71U
+2023-04-29 12:44:51 .....      1048576      1048576  XY6AK
+------------------- ----- ------------ ------------  ------------------------
+2023-04-29 12:44:52            9437898      9437756  15 files, 4 folders
+
+
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Scanning the drive for archives:
+1 file, 9440402 bytes (9220 KiB)
+
+Listing archive: arx.zip
+
+--
+Path = arx.zip
+Type = zip
+Physical Size = 9440402
+
+   Date      Time    Attr         Size   Compressed  Name
+------------------- ----- ------------ ------------  ------------------------
+2023-01-14 19:35:37 D....            0            0  ..out
+2023-01-14 19:35:37 .....          180          180  ..out/arx2.7z
+2023-01-28 11:46:58 D....            0            0  .pytest_cache
+2023-01-28 11:46:58 .....           37           37  .pytest_cache/.gitignore
+2023-01-28 11:46:58 .....          191          145  .pytest_cache/CACHEDIR.TAG
+2023-01-28 11:46:58 .....          302          206  .pytest_cache/README.md
+2023-01-28 11:46:58 D....            0            0  .pytest_cache/v
+2023-01-28 11:46:58 D....            0            0  .pytest_cache/v/cache
+2023-01-28 11:46:58 .....            2            2  .pytest_cache/v/cache/nodeids
+2023-01-28 11:46:58 .....            2            2  .pytest_cache/v/cache/stepwise
+2023-04-29 12:44:52 .....      1048576      1048576  2N5BS
+2023-04-29 12:44:51 .....      1048576      1048576  7FRJ9
+2023-04-29 12:44:51 .....      1048576      1048576  CWM42
+2023-04-29 12:44:52 .....      1048576      1048576  D47TP
+2023-04-29 12:44:51 .....      1048576      1048576  EEPQ9
+2023-04-29 12:44:51 .....      1048576      1048576  IB0QH
+2023-04-29 12:44:52 .....      1048576      1048576  Q9EW4
+2023-04-29 12:44:51 .....      1048576      1048576  XI71U
+2023-04-29 12:44:51 .....      1048576      1048576  XY6AK
+------------------- ----- ------------ ------------  ------------------------
+2023-04-29 12:44:52            9437898      9437756  15 files, 4 folders
+
+<br/> ----------------------------Captured stdout teardown---------------------------- <br/>
+Finish: 12:44:52.387492
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_1.py::TestPositive::test_step6</td>
+          <td class="col-duration">0.21</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Start: 12:44:52.388544
+
+
+
+
+
+
+<br/> -----------------------------Captured stderr setup------------------------------ <br/>1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,00600001 s, 175 MB/s
+1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,0058268 s, 180 MB/s
+1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,00621113 s, 169 MB/s
+1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,00620576 s, 169 MB/s
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Open archive: /home/zerg/out/arx.zip
+--
+Path = /home/zerg/out/arx.zip
+Type = zip
+Physical Size = 9440402
+
+Scanning the drive:
+5 folders, 10 files, 4195018 bytes (4097 KiB)
+
+Updating archive: /home/zerg/out/arx.zip
+
+Items to compress: 15
+
+
+Files read from disk: 10
+Archive size: 13635330 bytes (14 MiB)
+Everything is Ok
+
+
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Scanning the drive for archives:
+1 file, 13635330 bytes (14 MiB)
+
+Extracting archive: arx.zip
+--
+Path = arx.zip
+Type = zip
+Physical Size = 13635330
+
+Everything is Ok
+
+Folders: 5
+Files: 19
+Size:       13632202
+Compressed: 13635330
+
+0D0CC
+0GBAP
+2N5BS
+7FRJ9
+CFMGO
+CWM42
+D47TP
+DZ0R2
+EEPQ9
+IB0QH
+Q9EW4
+XI71U
+XY6AK
+
+0D0CC
+0GBAP
+2N5BS
+7FRJ9
+CFMGO
+CWM42
+D47TP
+DZ0R2
+EEPQ9
+IB0QH
+Q9EW4
+XI71U
+XY6AK
+
+0D0CC
+0GBAP
+2N5BS
+7FRJ9
+CFMGO
+CWM42
+D47TP
+DZ0R2
+EEPQ9
+IB0QH
+Q9EW4
+XI71U
+XY6AK
+
+0D0CC
+0GBAP
+2N5BS
+7FRJ9
+CFMGO
+CWM42
+D47TP
+DZ0R2
+EEPQ9
+IB0QH
+Q9EW4
+XI71U
+XY6AK
+
+05LSJ
+
+<br/> ----------------------------Captured stdout teardown---------------------------- <br/>
+Finish: 12:44:52.600714
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_1.py::TestPositive::test_step7</td>
+          <td class="col-duration">0.01</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Start: 12:44:52.602039
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Open archive: arx.zip
+--
+Path = arx.zip
+Type = zip
+Physical Size = 13635330
+
+Updating archive: arx.zip
+
+Items to compress: 0
+
+
+Files read from disk: 0
+Archive size: 22 bytes (1 KiB)
+Everything is Ok
+
+<br/> ----------------------------Captured stdout teardown---------------------------- <br/>
+Finish: 12:44:52.618261
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_1.py::TestPositive::test_step8</td>
+          <td class="col-duration">0.34</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>Start: 12:44:52.619581
+
+
+
+
+<br/> -----------------------------Captured stderr setup------------------------------ <br/>1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,00980657 s, 107 MB/s
+1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,00984128 s, 107 MB/s
+1+0 записей получено
+1+0 записей отправлено
+1048576 байт (1,0 MB, 1,0 MiB) скопирован, 0,0105272 s, 99,6 MB/s
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Scanning
+1 file, 1048576 bytes (1024 KiB)
+
+CRC32             Size  Name
+-------- -------------  ------------
+CF4FD694       1048576  1DIX8
+-------- -------------  ------------
+CF4FD694       1048576  
+
+Size: 1048576
+
+CRC32  for data:              CF4FD694
+
+Everything is Ok
+
+
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Scanning
+1 file, 1048576 bytes (1024 KiB)
+
+CRC32             Size  Name
+-------- -------------  ------------
+CF4FD694       1048576  1DIX8
+-------- -------------  ------------
+CF4FD694       1048576  
+
+Size: 1048576
+
+CRC32  for data:              CF4FD694
+
+Everything is Ok
+
+
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Scanning
+1 file, 1048576 bytes (1024 KiB)
+
+CRC32             Size  Name
+-------- -------------  ------------
+FCC79730       1048576  AM60I
+-------- -------------  ------------
+FCC79730       1048576  
+
+Size: 1048576
+
+CRC32  for data:              FCC79730
+
+Everything is Ok
+
+
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Scanning
+1 file, 1048576 bytes (1024 KiB)
+
+CRC32             Size  Name
+-------- -------------  ------------
+FCC79730       1048576  AM60I
+-------- -------------  ------------
+FCC79730       1048576  
+
+Size: 1048576
+
+CRC32  for data:              FCC79730
+
+Everything is Ok
+
+
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Scanning
+1 file, 1048576 bytes (1024 KiB)
+
+CRC32             Size  Name
+-------- -------------  ------------
+A8FD2130       1048576  WB7G1
+-------- -------------  ------------
+A8FD2130       1048576  
+
+Size: 1048576
+
+CRC32  for data:              A8FD2130
+
+Everything is Ok
+
+
+7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=ru_RU.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 4600H with Radeon Graphics          (860F01),ASM,AES-NI)
+
+Scanning
+1 file, 1048576 bytes (1024 KiB)
+
+CRC32             Size  Name
+-------- -------------  ------------
+A8FD2130       1048576  WB7G1
+-------- -------------  ------------
+A8FD2130       1048576  
+
+Size: 1048576
+
+CRC32  for data:              A8FD2130
+
+Everything is Ok
+
+<br/> ----------------------------Captured stdout teardown---------------------------- <br/>
+Finish: 12:44:52.966628
+<br/></div></td></tr></tbody></table></body></html>

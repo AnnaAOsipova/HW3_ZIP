@@ -1,0 +1,7 @@
+folder_in: /home/parallels/tst
+folder_out: /home/parallels/out
+folder_ext: /home/parallels/folder1
+folder_ext2: /home/parallels/folder2
+count: 3
+bs: 1M
+type: zip
