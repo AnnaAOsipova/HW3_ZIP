@@ -6,5 +6,5 @@ with open('config.yaml') as f:
 
 class TestNegative:
     def test_nstep1(self):
-        assert checkout_negative("cd {}; 7z t arx1.{}".format(data["folder_out"],
+        assert checkout_negative("cd {}; 7z t arxbad.{}".format(data["folder_out"],
                                                                 data["type"]), "ERROR:"), "test2 FAIL"
